@@ -1,0 +1,345 @@
+---
+title: "CHALLENGE B"
+author: "Gabriel SAIVE & Florence LAURENS"
+date: "30 novembre 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##TASK 1B - Predicting house prices in Ames, Iowa (continued)
+
+###Step 1 
+*Choose a ML technique : non-parametric kernel estimation, random forests, etc... Give a brief intuition of how it works. (1 points)*
+
+We choose the following ML technique : **randomForest**.
+Let us explain how it works.
+As the name suggest, this algorithm creates the forest with a number of trees.
+
+In general, the more trees in the forest the more robust the forest looks like. In the same way in the random forest classifier, the higher the number of trees in the forest gives the high accuracy results.
+
+The principle : to average the forecasts of several independent models to reduce the variance and therefore the forecast error. To build these different models, we select several bootstrap samples, that is to say prints with discounts.
+
+
+###Step 2
+*Train the chosen technique on the training data. Hint : packages np for non-parametric regressions, randomForest for random forests. Donâ€™t use the variable Id as a feature. (2 points)*
+
+Let us import the data base **train** and then thee **test** data base :
+
+``` {r, echo=TRUE, warning=FALSE}
+train <- read.csv(file = "data/train.csv")
+test <- read.csv(file = "data/test.csv")
+```
+
+We install some libraries needed for our code : tidyverse, np, randomForest and dplyr.
+```{r , echo=FALSE, warning=FALSE, message=FALSE}
+load.libraries <- c('tidyverse','np','markdown', 'randomForest', 'dplyr')
+install.lib <- load.libraries[!load.libraries %in% installed.packages()]
+for(libs in install.lib) install.packages(libs, dependencies = TRUE, repos = "https://cloud.r-project.org")
+sapply(load.libraries, require, character = TRUE)
+library(dplyr)
+library(tidyverse)
+```
+
+
+We remove the missing variables from our **train** database :
+```{r remove NA, echo=TRUE}
+
+remove.vars <- train %>% summarise_all(.funs = funs(sum(is.na(.)))) %>% gather(key = "feature", value = "missing.observations") %>% filter(missing.observations > 100) %>% select(feature) %>% unlist
+train <- train %>% select(- one_of(remove.vars))
+train <- train %>% filter(is.na(GarageType) == FALSE, is.na(MasVnrType) == FALSE, is.na(BsmtFinType2) == FALSE, is.na(BsmtExposure) == FALSE, is.na(Electrical) == FALSE)
+```
+
+
+Let us compute our machine learning method **random Forest** to our database.
+
+Firstly we load the package "randomForest".
+``` {r regression, echo=FALSE, message=FALSE, warning=FALSE}
+library(randomForest)
+```
+Now, we are able to regress SalePrice on our explanatory variables without Id using the function randomForest : 
+``` {r randomforest method, echo=TRUE}
+model<-randomForest(SalePrice~.-Id,data=train)
+model
+```
+We obtain a model with an explained variance around 87.44%. To compare with the linear regression model we had a model explaining 91.41% of the variance of the residuals.
+```{r lm regression}
+summary(lm(SalePrice~.-Id,data=train))$adj.r.squared
+```
+
+
+###Step 3
+*Make predictions on the test data, and compare them to the predictions of a linear regression of your choice. (2 points)*
+
+For some variables, the levels (meaning the values that a factor can take) of some factors are differents. To run the prediction we have to equalize the levels of the **train** database to the levels of the **test** database. This is needed for the following variables : Utilities, Condition2, HouseStyle, RoofMatl,Exterior1st,Exterior2nd,Heating,Electrical,GarageQual.
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+levels(test$Utilities)<-levels(train$Utilities)
+levels(test$Condition2)<-levels(train$Condition2)
+levels(test$HouseStyle)<-levels(train$HouseStyle)
+levels(test$RoofMatl)<-levels(train$RoofMatl)
+levels(test$Exterior1st)<-levels(train$Exterior1st)
+levels(test$Exterior2nd)<-levels(train$Exterior2nd)
+levels(test$Heating)<-levels(train$Heating)
+levels(test$Electrical)<-levels(train$Electrical)
+levels(test$GarageQual)<-levels(train$GarageQual)
+```
+
+Let us run a prediction of the sale price from our test sample with the **random forest** regression, and do the same with a linear model:
+```{r prediction,echo=TRUE}
+prediction.Forest<-predict(model,test)
+
+lm<-lm(SalePrice ~ MSZoning + LotArea + Neighborhood  + YearBuilt + OverallQual
+                    , data = train)
+prediction.lm<-predict.lm(lm,test)
+```
+We can now compare the result of the prediction with the **random forest** regression with the result of the linear regression:
+
+```{r comparaison, echo=TRUE}
+data.frame<-data.frame(Id=test$Id,"Prediction with Random Forest regression"=prediction.Forest,"Prediction with Linear regression"=prediction.lm,Differences=abs(prediction.Forest-prediction.lm),Rapport=(prediction.Forest-prediction.lm)/prediction.lm)
+head(data.frame)
+```
+
+
+
+
+##Task 2B - Overfitting in Machine Learning (continued)
+###Step 1
+*Estimate a low-flexibility local linear model on the training data. For that, you can use function npreg the package np. Choose ll for the method (local linear), and a bandwidth of 0.5; Call this model ll.fit.lowflex*
+```{r overfit, echo = FALSE, eval = FALSE, warning= FALSE, include = FALSE}
+library(tidyverse)
+library(np)
+library(caret)
+```
+
+
+We simulate 150 independant draws of x and y and put them in a table. We create our training and test dataset by slicing our table (respectively 80% and 20%).
+```{r, echo=FALSE}
+set.seed(1)
+x<-rnorm(150,0,1)
+e<-rnorm(150,0,1)
+y<-x^3+e
+yhat<-x^3
+
+six<-data.frame(x=x,y=y)
+training<-slice(six,1:120)
+test<-slice(six,121:150)
+```
+This is how it looks like on a graph:
+```{r,echo=FALSE}
+ggplot(data=six,aes(x=x,y=y)) +
+  geom_point() +
+  geom_line(aes(x=x,y=yhat))+ 
+  labs(caption="Step 1")+
+  theme(plot.caption = element_text(hjust=0.5))
+```
+
+We estimate a low-flexibility local linear model on our training data with a bandwidth of 0.5.
+```{r}
+ll.fit.lowflex <- npreg(y ~ x, data = training, method = "ll", bws = 0.5)
+summary(ll.fit.lowflex)
+```
+
+
+
+###Step 2
+*Estimate a high-flexibility local linear model on the training data. For that, you can use function npreg the package np. Choose ll for the method (local linear), and a bandwidth of 0.01; Call this model ll.fit.highflex*
+
+We estimate a high-flexibility local linear model on the training data with a bandwidth of 0.01: 
+```{r step2}
+ll.fit.highflex <- npreg(y ~ x, data = training, method = "ll", bws = 0.01)
+summary(ll.fit.highflex)
+```
+
+
+###Step 3 
+*Plot the scatterplot of x-y, along with the predictions of ll.fit.lowflex and ll.fit.highflex, on only the training data. See Figure 1.*
+
+First we create predictions of y using the low and the high flexibility local linear model.
+
+```{r, echo=FALSE}
+y.ll.lowflex <- predict(object = ll.fit.lowflex, newdata = training)
+y.ll.highflex <- predict(object = ll.fit.highflex, newdata = training)
+
+training$y.ll.highflex<- y.ll.highflex
+training$y.ll.lowflex<- y.ll.lowflex
+```
+We can plot it : the blue line correspond to the prediction of y using the high flexibility model, the red one the prediction of y using the low flexibility model, and the black one is the true regression line.
+```{r,echo=FALSE}
+ggplot(data=training) + 
+  geom_point(x=training$x,y=training$y) +
+  geom_line(aes(x=training$x,y=training$y.ll.highflex), color="blue") +
+  geom_line(aes(x=training$x,y=training$y.ll.lowflex), color="red")+ 
+   geom_line(aes(x=training$x,y=(training$x)^3))+
+  labs(x="x",y="y",caption="Figure 1: Step 3 - Predictions of ll.fit.lowflex and ll.fit.highflex on training data")+
+  theme(plot.caption = element_text(hjust=0.5))
+```
+
+
+###Step4
+*Between the two models, which predictions are more variable? Which predictions have the least bias?*
+
+We compare the variance of y.ll.low.flex with the variance of y.ll.high.flex and the one of y.
+
+```{r, echo=TRUE}
+var(training$y.ll.lowflex)
+var(training$y.ll.highflex)
+var(training$y)
+```
+The y.ll.lowflex as the smallest variance, but this variance is too far from this one of y, so low flex prediction have the highest bias, in contrary to the high flex prediction, which has the greatest variance, and is the least biais. We can see this on the plot, its line is going through many points of y. 
+
+###Step5
+*Plot the scatterplot of x-y, along with the predictions of ll.fit.lowflex and ll.fit.highflex now using the test data. Which predictions are more variable? What happened to the bias of the least biased model?*
+
+We create new predictions with the test dataset.
+```{r,echo=FALSE}
+y.ll.lowflex <- predict(object = ll.fit.lowflex, newdata = test)
+y.ll.highflex <- predict(object = ll.fit.highflex, newdata = test)
+test$y.ll.highflex<- y.ll.highflex
+test$y.ll.lowflex<- y.ll.lowflex
+```
+Let us plote these predictions:
+
+```{r,echo=FALSE}
+ggplot(data=test) + 
+  geom_point(x=test$x,y=test$y) +
+  geom_line(aes(x=test$x,y=test$y.ll.highflex), color="blue") +
+  geom_line(aes(x=test$x,y=test$y.ll.lowflex), color="red")+ 
+  geom_line(aes(x=test$x,y=(test$x)^3))+
+  labs(x="x",y="y",caption="Figure 2: Step 5 - Predictions of ll.fit.lowflex and ll.fit.highflex on test data")+
+  theme(plot.caption = element_text(hjust=0.5))
+```
+
+
+```{r, echo=TRUE}
+var(test$y.ll.lowflex)
+var(test$y.ll.highflex)
+var(test$y)
+```
+
+The y.ll.lowflex as the smallest variance, but this variance is too far from this one of y, so low flex prediction have the highest bias.
+The prediction is more biased than with the training data, the difference between the variance of the high flex model and y has increased.
+
+###Step 6
+*Create a vector of bandwidth going from 0.01 to 0.5 with a step of 0.001*
+
+Let us create vector of several bandwidths:
+```{r}
+bw <- seq(0.01, 0.5, by = 0.001) 
+```
+
+
+###Step 7
+*Train local linear model y ~ x on training with each bandwidth*
+
+We create a function doing a non parametric regression for every bandwidth. We apply in this function each bandwidth from **bw**, using **lapply**. 
+```{r step 7}
+f<-function(bw) {npreg(y ~ x, data = training, method = "ll", bws = bw)}
+
+train.bwd <- lapply(X = bw, f)
+```
+###Step 8
+*Compute for each bandwidth the MSE-training*
+
+We create a function that predict y for every bandwidth using our training data. Then We get our mean square error by doing the squared difference between y and our predictions.
+```{r}
+f2<-function(fit.model){
+  predictions <- predict(object = fit.model, newdata = training)
+  training %>% mutate(squared.error = (y - predictions)^2) %>% summarize(mse = mean(squared.error))
+}
+MSE.train<- unlist(lapply(train.bwd,f2))
+```
+
+###Step 9
+*Compute for each bandwidth the MSE-test*
+
+We create a function that predict y for every bandwidth using our test data. Then We get our mean square error by doing the squared difference between y and our predictions.
+```{r}
+f3 <- function(fit.model){
+  predictions <- predict(object = fit.model, newdata = test)
+  test %>% mutate(squared.error = (y - predictions)^2) %>% summarize(mse = mean(squared.error))
+}
+MSE.test <- unlist(lapply(X = train.bwd, f3))
+```
+###Step 10
+*Draw on the same plot how the MSE on training data, and test data, change when the bandwidth increases. Conclude*
+
+First, we create a table with the bandwidth and our predictions for the training and the test data set.
+```{r}
+mse.df <- data.frame(bw, MSE.train, MSE.test)
+```
+```{r plot, echo=FALSE}
+ggplot(data=mse.df) + 
+  geom_line(mapping = aes(x = bw, y = MSE.train), color = "blue") +
+  geom_line(mapping = aes(x = bw, y = MSE.test), color = "orange")+
+  labs(x="bandwidth",y="mse.train",caption="Figure 3: Step 10 - MSE on training and test data for different bandwidth - local linear regression")+
+  theme(plot.caption = element_text(hjust=0.5))
+```
+
+
+##Task 3B - Privacy regulation compliance in France
+
+###Step 1 
+*Import the CNIL dataset from the Open Data Portal. (1 point)*
+
+Let us import the CNIL data set : 
+
+```{r library,echo=FALSE,warning=FALSE,message=FALSE}
+library(tidyverse)
+library(dplyr)
+```
+
+```{r import data open portal, echo=TRUE, message= FALSE, warning= FALSE}
+CIL <- read.csv(file = "data/CNIL.csv",sep=";",header = T)
+summary(CIL)
+```
+###Step 2
+*Show a (nice) table with the number of organizations that has nominated a CNIL per department.*
+
+Firstly, we clean the data base: we have to delete all the missing variables and then we create a new table "departement" by selection ONLY the two first number of *Code Postal*. 
+In the **table** we have for each department the number of organization that has nomitated a CNIL. 
+```{r table department}
+sum(is.na(CIL))
+CIL.NA<-na.omit(CIL)
+
+departement<-substr(CIL.NA$Code_Postal,start = 1,stop = 2)
+CIL.NA$departement<-departement
+
+table<-as.data.frame(table(departement))
+colnames(table)<-c("Department","Number of CNIL")
+table
+```
+We deleted 302 observations because of the NA.
+
+###Step 3
+*Merge the information from the SIREN dataset into the CNIL data. Explain the method you use*
+
+For this question, we combine the two data base.
+The SIREN dataset is very large , and long to download so we only dowload the columns which are interesting to solve the problem, which are the SIREN and the size of the compagny.
+```{r import SIREN dataset without duplicated}
+tabAll <- read.csv(file="data/SIREN.csv",
+                   sep=";",dec=".",header = T, colClasses = c(NA,rep("NULL",78)))
+tabAll<-tabAll[!duplicated(tabAll$SIREN),]
+```
+
+With the command "gather" we merge the information from the SIREN dataset into the CNIL data.
+```{r gather}
+library(dplyr)
+data2<-CIL.NA[( CIL.NA$"ï..Siren" %in% tabAll$SIREN),]
+head(data2)
+```
+
+
+###Step 4
+*Plot the histogram of the size of the companies that nominated a CIL. Comment. *
+
+Let us plot the histogram of the size of the companies that nominated a CIL.
+```{r histograms, echo = TRUE, warning=FALSE, message=FALSE}
+data3<-tabAll[(tabAll$SIREN %in% CIL.NA$"ï..Siren"),]
+plot(factor(data3$LIBTEFEN),las=2,cex.names=0.5)
+```
+
+
+
+
