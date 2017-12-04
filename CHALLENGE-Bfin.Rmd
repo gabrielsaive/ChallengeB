@@ -2,7 +2,7 @@
 title: "CHALLENGE B"
 author: "Gabriel SAIVE & Florence LAURENS"
 date: "30 novembre 2017"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
