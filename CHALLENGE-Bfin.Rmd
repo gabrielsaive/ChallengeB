@@ -47,9 +47,15 @@ library(tidyverse)
 We remove the missing variables from our **train** database :
 ```{r remove NA, echo=TRUE}
 
-remove.vars <- train %>% summarise_all(.funs = funs(sum(is.na(.)))) %>% gather(key = "feature", value = "missing.observations") %>% filter(missing.observations > 100) %>% select(feature) %>% unlist
+remove.vars <- train %>% summarise_all(.funs = funs(sum(is.na(.)))) %>%
+  gather(key = "feature", value = "missing.observations") %>%
+  filter(missing.observations > 100) %>% select(feature) %>% unlist
 train <- train %>% select(- one_of(remove.vars))
-train <- train %>% filter(is.na(GarageType) == FALSE, is.na(MasVnrType) == FALSE, is.na(BsmtFinType2) == FALSE, is.na(BsmtExposure) == FALSE, is.na(Electrical) == FALSE)
+train <- train %>% filter(is.na(GarageType) == FALSE,
+                          is.na(MasVnrType) == FALSE,
+                          is.na(BsmtFinType2) == FALSE,
+                          is.na(BsmtExposure) == FALSE,
+                          is.na(Electrical) == FALSE)
 ```
 
 
@@ -97,7 +103,11 @@ prediction.lm<-predict.lm(lm,test)
 We can now compare the result of the prediction with the **random forest** regression with the result of the linear regression:
 
 ```{r comparaison, echo=TRUE}
-data.frame<-data.frame(Id=test$Id,"Prediction with Random Forest regression"=prediction.Forest,"Prediction with Linear regression"=prediction.lm,Differences=abs(prediction.Forest-prediction.lm),Rapport=(prediction.Forest-prediction.lm)/prediction.lm)
+data.frame<-data.frame(Id=test$Id,
+                       "Prediction with Random Forest regression"=prediction.Forest,
+                       "Prediction with Linear regression"=prediction.lm,
+                    Differences=abs(prediction.Forest-prediction.lm),
+                    Rapport=(prediction.Forest-prediction.lm)/prediction.lm)
 head(data.frame)
 ```
 
@@ -127,6 +137,7 @@ training<-slice(six,1:120)
 test<-slice(six,121:150)
 ```
 This is how it looks like on a graph:
+
 ```{r,echo=FALSE}
 ggplot(data=six,aes(x=x,y=y)) +
   geom_point() +
@@ -317,7 +328,7 @@ We deleted 302 observations because of the NA.
 
 For this question, we combine the two data base.
 The SIREN dataset is very large , and long to download so we only dowload the columns which are interesting to solve the problem, which are the SIREN and the size of the compagny.
-```{r import SIREN dataset without duplicated too large to be on GitHub}
+```{r import SIREN dataset without duplicated}
 tabAll <- read.csv(file=file.choose(),
                    sep=";",dec=".",header = T, colClasses = c(NA,rep("NULL",78)))
 tabAll<-tabAll[!duplicated(tabAll$SIREN),]
