@@ -8,6 +8,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+[Link to the github repo](www.github.com/gabrielsaive/ChallengeB.git)
 
 ##TASK 1B - Predicting house prices in Ames, Iowa (continued)
 
@@ -328,10 +329,10 @@ We deleted 302 observations because of the NA.
 
 For this question, we combine the two data base.
 The SIREN dataset is very large , and long to download so we only dowload the columns which are interesting to solve the problem, which are the SIREN and the size of the compagny.
-```{r import SIREN dataset without duplicated}
-tabAll <- read.csv(file=file.choose(),
-                   sep=";",dec=".",header = T, colClasses = c(NA,rep("NULL",78)))
-tabAll<-tabAll[!duplicated(tabAll$SIREN),]
+It take this long to import the dataset: 
+```{r timer : choose the 8Go SIREN dataset,echo=FALSE}
+timer <- system.time("tabAll"<-read.csv(file=file.choose(),
+                   sep=";",dec=".",header = T, colClasses = c(NA,rep("NULL",78))))
 ```
 
 With the command "gather" we merge the information from the SIREN dataset into the CNIL data.
